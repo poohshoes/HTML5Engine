@@ -50,6 +50,13 @@ function update(secondsElapsed)
     if(keysDown[ascii("D")])
     {
         guy.x += guyspeed * secondsElapsed;
+        guy.sprite = playerRed;
+    }
+    
+    if(keysDown[ascii("A")])
+    {
+        guy.x -= guyspeed * secondsElapsed;
+        guy.sprite = playerBlue;
     }
     
     for(i = 0;
@@ -109,7 +116,19 @@ function drawEntity(entity)
         var frame = Math.floor(sprite.animationSeconds * sprite.framesPerSecond);
         var sourceX = sprite.frameWidth * frame;
         var sourceY = 0;
-        canvasContext.drawImage(sprite.image, sourceX, sourceY, sprite.frameWidth, sprite.frameHeight, entity.x, entity.y, sprite.frameWidth, sprite.frameHeight);
+        var drawX = entity.x;
+        if(sprite.flipH)
+        {
+            canvasContext.save();
+            canvasContext.translate(canvasContext.canvas.width, 0);
+            canvasContext.scale(-1, 1);
+            drawX = canvasContext.canvas.width - drawX - sprite.frameWidth;
+        }
+        canvasContext.drawImage(sprite.image, sourceX, sourceY, sprite.frameWidth, sprite.frameHeight, drawX, entity.y, sprite.frameWidth, sprite.frameHeight);
+        if(sprite.flipH)
+        {
+            canvasContext.restore();
+        }
     }
 }
 
@@ -129,6 +148,7 @@ function animatedSprite(name, frameWidth, frameHeight, framesPerSecond)
     this.frameHeight = frameHeight;
     this.animationSeconds = 0;
     this.framesPerSecond = framesPerSecond;
+    this.flipH = false;
 }
 
 function entity(x, y, sprite)
@@ -143,8 +163,12 @@ function addEntity(entity)
 {
     entities[entities.length] = entity;
 }
-var guy = new entity(100, 100, new staticSprite("data/s_man_0.png"));
-var guyspeed = 10;
+
+var playerRed = new animatedSprite("data/s_player_red.png", 16, 32, 8);
+var playerBlue = new animatedSprite("data/s_player_blue.png", 16, 32, 8);
+playerBlue.flipH = true;
+var guy = new entity(100, 100, playerRed);
+var guyspeed = 20;
 addEntity(guy);
 
 var savePoint = new entity(200, 100, new animatedSprite("data/s_save_point_standing.png", 16, 32, 8));
@@ -213,4 +237,4 @@ function initGame(images) {
     // some code here...
 }*/
 
-//convert s_save_point_standing_0.png +append s_save_point_standing.png
+//convert s_player_dead_0.png s_player_dead_1.png +append s_player_dead.png
