@@ -49,16 +49,21 @@ function update(secondsElapsed)
 {
     if(keysDown[ascii("D")])
     {
-        guy.x += guyspeed * secondsElapsed;
+        guySpeed = approach(guySpeed, guyMaxSpeed, guyAcceleration * secondsElapsed);
         guy.sprite = playerRed;
     }
-    
-    if(keysDown[ascii("A")])
+    else if(keysDown[ascii("A")])
     {
-        guy.x -= guyspeed * secondsElapsed;
+        guySpeed = approach(guySpeed, -guyMaxSpeed, guyAcceleration * secondsElapsed);
         guy.sprite = playerBlue;
     }
-    
+    else
+    {
+        guySpeed = approach(guySpeed, 0, guyAcceleration * secondsElapsed);
+        guy.sprite.animationSeconds = 0;
+    }
+    guy.x += guySpeed * secondsElapsed;
+        
     for(i = 0;
         i < entities.length;
         i++)
@@ -75,6 +80,18 @@ function update(secondsElapsed)
                 sprite.animationSeconds -= totalAnimationSeconds;
             }
         }
+    }
+}
+
+function approach(start, destination, rate)
+{
+    if(start < destination)
+    {
+        return Math.min(start + rate, destination);
+    }
+    else
+    {
+        return Math.max(start - rate, destination);
     }
 }
 
@@ -168,8 +185,10 @@ var playerRed = new animatedSprite("data/s_player_red.png", 16, 32, 8);
 var playerBlue = new animatedSprite("data/s_player_blue.png", 16, 32, 8);
 playerBlue.flipH = true;
 var guy = new entity(100, 100, playerRed);
-var guyspeed = 20;
 addEntity(guy);
+var guyAcceleration = 150;
+var guySpeed = 0;
+var guyMaxSpeed = 40;
 
 var savePoint = new entity(200, 100, new animatedSprite("data/s_save_point_standing.png", 16, 32, 8));
 addEntity(savePoint);
