@@ -127,33 +127,58 @@ function draw()
     }
 }
 
+function drawCircle(x, y)
+{
+    var radius = 2 * scale;
+    canvasContext.beginPath();
+    canvasContext.arc(x * scale, canvasContext.canvas.height - (y * scale), radius, 0, 2 * Math.PI, false);
+    canvasContext.fillStyle = 'green';
+    canvasContext.fill();
+}
+
 function drawEntity(entity)
 {
-    var sprite = entity.sprite;
-    if(sprite.type == "static")
-    {
-        canvasContext.drawImage(sprite.image, entity.x, entity.y);
-    }
-    else if(sprite.type == "animated")
+    var sprite = entity.sprite;    
+    var sourceX = 0;
+    var sourceY = 0;
+    var width = sprite.image.width;
+    var height = sprite.image.height;
+    
+    if(sprite.type == "animated")
     {
         var frame = Math.floor(sprite.animationSeconds * sprite.framesPerSecond);
-        var sourceX = sprite.frameWidth * frame;
-        var sourceY = 0;
-        var drawX = entity.x;
-        if(sprite.flipH)
-        {
-            canvasContext.save();
-            canvasContext.translate(canvasContext.canvas.width, 0);
-            canvasContext.scale(-1, 1);
-            drawX = canvasContext.canvas.width - drawX - sprite.frameWidth;
-        }
-        // TODO(ian): When rounding we should also consider the scale so we can have finer movement.
-        canvasContext.drawImage(sprite.image, sourceX, sourceY, sprite.frameWidth, sprite.frameHeight, Math.round(drawX), Math.round(entity.y), sprite.frameWidth * scale, sprite.frameHeight * scale);
-        if(sprite.flipH)
-        {
-            canvasContext.restore();
-        }
+        sourceX = sprite.frameWidth * frame;
+        width = sprite.frameWidth;
+        height = sprite.frameHeight;
     }
+    
+    // TODO(ian): When rounding we should also consider the scale so we can have finer movement.
+    var x = entity.x * scale;
+    x -= width * scale / 2;
+    // Note(ian): To normalize with common maths we make y go up.
+    var y = canvasContext.canvas.height - (entity.y * scale);
+    y -= height * scale;
+    
+    x = Math.round(x);
+    y = Math.round(y);
+    
+    if(sprite.flipH)
+    {
+        canvasContext.save();
+        canvasContext.translate(canvasContext.canvas.width, 0);
+        canvasContext.scale(-1, 1);
+        x = canvasContext.canvas.width - x - (sprite.frameWidth * scale);
+    }
+    
+    canvasContext.drawImage(sprite.image, sourceX, sourceY, width, height, x, y, width * scale, height * scale);
+    
+    
+    if(sprite.flipH)
+    {
+        canvasContext.restore();
+    }
+    
+    drawCircle(entity.x, entity.y);
 }
 
 function staticSprite(name)
@@ -199,6 +224,9 @@ var guyMaxSpeed = 40;
 
 var savePoint = new entity(200, 100, new animatedSprite("data/s_save_point_standing.png", 16, 32, 8));
 addEntity(savePoint);
+
+var staticSprite = new entity(300, 100, new staticSprite("data/s_man_0.png"));
+addEntity(staticSprite);
 
 var lastUpdateTime;
 function main()
