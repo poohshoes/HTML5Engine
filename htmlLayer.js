@@ -78,22 +78,21 @@ function update(secondsElapsed)
         guy.sprite.animationSeconds = 0;
     }
     
-    var guySpeedLength = v2Length(playerAcceleration);
-    if(guySpeedLength > 1)
+    var playerAccelerationLength = v2Length(playerAcceleration);
+    if(playerAccelerationLength > 1)
     {
-        v2MultiplyAssign(playerAcceleration, 1 / Math.sqrt(guySpeedLength));
+        v2MultiplyAssign(playerAcceleration, 1 / Math.sqrt(playerAccelerationLength));
     }
     
-    // TODO(ian): Check for max speed.
-    v2MultiplyAssign(playerAcceleration, guySpeed);
-    // TODO(ian): Apply drag here.
+    // TODO(ian): Limit by max speed.
+    v2MultiplyAssign(playerAcceleration, guy.motion.acceleration);
+    // ddP += -MoveSpec->Drag*Entity->dP;
+    v2SubtractAssign(playerAcceleration, v2Multiply(guy.motion.velocity, guy.motion.drag));
     // ddP * sqare(dt) * 0.5 + dP * dt
-    var changeInPosition = v2Add(v2Multiply(v2Multiply(playerAcceleration, Math.pow(secondsElapsed, 2)), 0.5), v2Multiply(guyVelocity, secondsElapsed));
-    guyVelocity = v2Add(v2Multiply(playerAcceleration, secondsElapsed), guyVelocity);
-    var oldPlayerPosition = new v2(guy.x, guy.y);
-    var newPlayerPosition = v2Add(oldPlayerPosition, changeInPosition);
-    guy.x = newPlayerPosition.x;
-    guy.y = newPlayerPosition.y;
+    var changeInPosition = v2Add(v2Multiply(v2Multiply(playerAcceleration, Math.pow(secondsElapsed, 2)), 0.5), v2Multiply(guy.motion.velocity, secondsElapsed));
+    guy.motion.velocity = v2Add(v2Multiply(playerAcceleration, secondsElapsed), guy.motion.velocity);
+    var newPlayerPosition = v2Add(guy.position, changeInPosition);
+    guy.position = newPlayerPosition;
     
     for(i = 0;
         i < entities.length;
@@ -179,10 +178,10 @@ function drawEntity(entity)
     }
     
     // TODO(ian): When rounding we should also consider the scale so we can have finer movement.
-    var x = entity.x * scale;
+    var x = entity.position.x * scale;
     x -= width * scale / 2;
     // Note(ian): To normalize with common maths we make y go up.
-    var y = canvasContext.canvas.height - (entity.y * scale);
+    var y = canvasContext.canvas.height - (entity.position.y * scale);
     y -= height * scale;
     
     x = Math.round(x);
@@ -204,7 +203,7 @@ function drawEntity(entity)
         canvasContext.restore();
     }
     
-    drawCircle(entity.x, entity.y);
+    drawCircle(entity.position.x, entity.position.y);
 }
 
 function staticSprite(name)
@@ -228,9 +227,17 @@ function animatedSprite(name, frameWidth, frameHeight, framesPerSecond)
 
 function entity(x, y, sprite)
 {
-    this.x = x;
-    this.y = y;
+    this.position = new v2(x, y);
     this.sprite = sprite;
+    this.motion = null;
+}
+
+function motion()
+{
+    this.velocity = new v2();
+    this.maxVelocity = 40;
+    this.acceleration = 200;
+    this.drag = 4;
 }
 
 var entities = [];
@@ -243,11 +250,8 @@ var playerRed = new animatedSprite("data/s_player_red.png", 16, 32, 8);
 var playerBlue = new animatedSprite("data/s_player_blue.png", 16, 32, 8);
 playerBlue.flipH = true;
 var guy = new entity(100, 100, playerRed);
+guy.motion = new motion();
 addEntity(guy);
-var guyAcceleration = 150;
-var guySpeed = 20;
-var guyVelocity = new v2();
-var guyMaxSpeed = 40;
 
 var savePoint = new entity(200, 100, new animatedSprite("data/s_save_point_standing.png", 16, 32, 8));
 addEntity(savePoint);
@@ -315,6 +319,12 @@ function v2Add(one, two)
     result.x = one.x + two.x;
     result.y = one.y + two.y;
     return result;
+}
+
+function v2SubtractAssign(one, two)
+{
+    one.x -= two.x;
+    one.y -= two.y;
 }
 
 function v2Length(v2)
