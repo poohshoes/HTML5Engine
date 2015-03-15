@@ -11,15 +11,21 @@ gamepaddisconnected
 keydown, keypress, keyup
 mousedown, mousemove, mouseleave, mouseenter, mouseup, mouseout, mouseover*/
 
+var scale = 2;
 var canvas = document.createElement("canvas");
 var canvasContext = canvas.getContext("2d");
-canvas.width = 480;
-canvas.height = 270;
+canvas.width = 480 * scale;
+canvas.height = 270 * scale;
 canvas.style.display = "block";
 canvas.style.margin = "0px auto";
 //http://www.dbp-consulting.com/tutorials/canvas/CanvasKeyEvents.html
 canvas.setAttribute("tabindex", 0);
 document.body.appendChild(canvas);
+// Blog talking about how to scale the canvas on the various browsers.
+// http://phoboslab.org/log/2012/09/drawing-pixels-is-hard
+canvasContext.imageSmoothingEnabled = false;
+canvasContext.webkitImageSmoothingEnabled = false;
+canvasContext.mozImageSmoothingEnabled = false;
 
 canvas.addEventListener("mousedown", doMouseDown, true);
 function doMouseDown(event)
@@ -141,7 +147,8 @@ function drawEntity(entity)
             canvasContext.scale(-1, 1);
             drawX = canvasContext.canvas.width - drawX - sprite.frameWidth;
         }
-        canvasContext.drawImage(sprite.image, sourceX, sourceY, sprite.frameWidth, sprite.frameHeight, drawX, entity.y, sprite.frameWidth, sprite.frameHeight);
+        // TODO(ian): When rounding we should also consider the scale so we can have finer movement.
+        canvasContext.drawImage(sprite.image, sourceX, sourceY, sprite.frameWidth, sprite.frameHeight, Math.round(drawX), Math.round(entity.y), sprite.frameWidth * scale, sprite.frameHeight * scale);
         if(sprite.flipH)
         {
             canvasContext.restore();
