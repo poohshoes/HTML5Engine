@@ -1,5 +1,4 @@
-// Use canvas.scale() to change the scale for larger resolutions?
-
+//====== SETUP ======
 //https://developer.mozilla.org/en-US/docs/Web/Events
 /*click
 contextmenu // right button before context menu is shown
@@ -27,6 +26,7 @@ canvasContext.imageSmoothingEnabled = false;
 canvasContext.webkitImageSmoothingEnabled = false;
 canvasContext.mozImageSmoothingEnabled = false;
 
+//====== INPUT ======
 canvas.addEventListener("mousedown", doMouseDown, true);
 function doMouseDown(event)
 {
@@ -51,25 +51,50 @@ function ascii(character)
     return result;
 }
 
+//====== UPDATE ======
 function update(secondsElapsed) 
 {
+    var playerAcceleration = new v2();
     if(keysDown[ascii("D")])
     {
-        guySpeed = approach(guySpeed, guyMaxSpeed, guyAcceleration * secondsElapsed);
+        playerAcceleration.x += 1;
         guy.sprite = playerRed;
     }
-    else if(keysDown[ascii("A")])
+    if(keysDown[ascii("A")])
     {
-        guySpeed = approach(guySpeed, -guyMaxSpeed, guyAcceleration * secondsElapsed);
+        playerAcceleration.x -= 1;
         guy.sprite = playerBlue;
     }
-    else
+    if(keysDown[ascii("W")])
     {
-        guySpeed = approach(guySpeed, 0, guyAcceleration * secondsElapsed);
+        playerAcceleration.y += 1;
+    }
+    if(keysDown[ascii("S")])
+    {
+        playerAcceleration.y -= 1;
+    }
+    if(playerAcceleration.x == 0 && playerAcceleration.y == 0)
+    {
         guy.sprite.animationSeconds = 0;
     }
-    guy.x += guySpeed * secondsElapsed;
-        
+    
+    var guySpeedLength = v2Length(playerAcceleration);
+    if(guySpeedLength > 1)
+    {
+        v2MultiplyAssign(playerAcceleration, 1 / Math.sqrt(guySpeedLength));
+    }
+    
+    // TODO(ian): Check for max speed.
+    v2MultiplyAssign(playerAcceleration, guySpeed);
+    // TODO(ian): Apply drag here.
+    // ddP * sqare(dt) * 0.5 + dP * dt
+    var changeInPosition = v2Add(v2Multiply(v2Multiply(playerAcceleration, Math.pow(secondsElapsed, 2)), 0.5), v2Multiply(guyVelocity, secondsElapsed));
+    guyVelocity = v2Add(v2Multiply(playerAcceleration, secondsElapsed), guyVelocity);
+    var oldPlayerPosition = new v2(guy.x, guy.y);
+    var newPlayerPosition = v2Add(oldPlayerPosition, changeInPosition);
+    guy.x = newPlayerPosition.x;
+    guy.y = newPlayerPosition.y;
+    
     for(i = 0;
         i < entities.length;
         i++)
@@ -101,6 +126,7 @@ function approach(start, destination, rate)
     }
 }
 
+//====== DRAW ======
 function draw()
 {
     // Fill to black.
@@ -219,7 +245,8 @@ playerBlue.flipH = true;
 var guy = new entity(100, 100, playerRed);
 addEntity(guy);
 var guyAcceleration = 150;
-var guySpeed = 0;
+var guySpeed = 20;
+var guyVelocity = new v2();
 var guyMaxSpeed = 40;
 
 var savePoint = new entity(200, 100, new animatedSprite("data/s_save_point_standing.png", 16, 32, 8));
@@ -236,6 +263,7 @@ function main()
 	update(secondsSinceUpdate);
 	draw();
     
+    // TODO(ian): Move into renderer and apply scale?
     canvasContext.font = "12px Arial";
     canvasContext.fillStyle = "#FFFFFF";
     canvasContext.fillText(secondsSinceUpdate,10,10);
@@ -251,6 +279,51 @@ function reset()
 
 reset();
 main();
+
+//====== MATH ======
+function v2(x, y)
+{
+    if(isNaN(x))
+    {
+        x = 0;
+    }
+    if(isNaN(y))
+    {
+        y = 0;
+    }
+    this.x = x;
+    this.y = y;
+}
+
+function v2Multiply(one, scalar)
+{
+    var result = new v2();
+    result.x = one.x * scalar;
+    result.y = one.y * scalar;
+    return result;
+}
+
+function v2MultiplyAssign(v2, scalar)
+{
+    v2.x *= scalar;
+    v2.y *= scalar;
+}
+
+function v2Add(one, two)
+{
+    var result = new v2();
+    result.x = one.x + two.x;
+    result.y = one.y + two.y;
+    return result;
+}
+
+function v2Length(v2)
+{
+    var result = Math.pow(v2.x, 2) + Math.pow(v2.y, 2);
+    result = Math.sqrt(result);
+    return result;
+}
+
 
 /*
 var FPS = 30;
