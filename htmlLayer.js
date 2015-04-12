@@ -78,21 +78,26 @@ function update(secondsElapsed)
         guy.sprite.animationSeconds = 0;
     }
     
-    var playerAccelerationLength = v2Length(playerAcceleration);
-    if(playerAccelerationLength > 1)
-    {
-        v2MultiplyAssign(playerAcceleration, 1 / Math.sqrt(playerAccelerationLength));
-    }
+    v2NormalizeAssign(playerAcceleration);
+    v2MultiplyAssign(playerAcceleration, 100);
+    moveEntity(guy, playerAcceleration, secondsElapsed);
     
-    // TODO(ian): Limit by max speed.
-    v2MultiplyAssign(playerAcceleration, guy.motion.acceleration);
-    // ddP += -MoveSpec->Drag*Entity->dP;
-    v2SubtractAssign(playerAcceleration, v2Multiply(guy.motion.velocity, guy.motion.drag));
-    // ddP * sqare(dt) * 0.5 + dP * dt
-    var changeInPosition = v2Add(v2Multiply(v2Multiply(playerAcceleration, Math.pow(secondsElapsed, 2)), 0.5), v2Multiply(guy.motion.velocity, secondsElapsed));
-    guy.motion.velocity = v2Add(v2Multiply(playerAcceleration, secondsElapsed), guy.motion.velocity);
-    var newPlayerPosition = v2Add(guy.position, changeInPosition);
-    guy.position = newPlayerPosition;
+    // Old movement code.
+    // var playerAccelerationLength = v2Length(playerAcceleration);
+    // if(playerAccelerationLength > 1)
+    // {
+        // v2MultiplyAssign(playerAcceleration, 1 / Math.sqrt(playerAccelerationLength));
+    // }
+    
+    // // TODO(ian): Limit by max speed.
+    // v2MultiplyAssign(playerAcceleration, guy.motion.acceleration);
+    // // ddP += -MoveSpec->Drag*Entity->dP;
+    // v2SubtractAssign(playerAcceleration, v2Multiply(guy.motion.velocity, guy.motion.drag));
+    // // ddP * sqare(dt) * 0.5 + dP * dt
+    // var changeInPosition = v2Add(v2Multiply(v2Multiply(playerAcceleration, Math.pow(secondsElapsed, 2)), 0.5), v2Multiply(guy.motion.velocity, secondsElapsed));
+    // guy.motion.velocity = v2Add(v2Multiply(playerAcceleration, secondsElapsed), guy.motion.velocity);
+    // var newPlayerPosition = v2Add(guy.position, changeInPosition);
+    // guy.position = newPlayerPosition;
     
     for(i = 0;
         i < entities.length;
@@ -100,7 +105,7 @@ function update(secondsElapsed)
     {
         var entity = entities[i];
         var sprite = entity.sprite;
-        if(sprite.type == "animated")
+        if(sprite != null && sprite.type == "animated")
         {
             sprite.animationSeconds += secondsElapsed;
             var numFrames = sprite.image.width / sprite.frameWidth;
@@ -111,6 +116,178 @@ function update(secondsElapsed)
             }
         }
     }
+}
+
+function moveEntity(entity, acceleration, secondsElapsed)
+{
+    // todo: handle the case where entity doesn't have a physics?
+    
+    // note: casey has a note here saying we need to implement ODE?    
+    var drag = 5;
+    v2AddAssign(acceleration, v2Multiply(entity.motion.velocity, -drag));
+    
+    var positionDelta = v2Add(
+        v2Multiply(acceleration, 0.5 * Math.pow(secondsElapsed, 2)), 
+        v2Multiply(entity.motion.velocity, secondsElapsed)); 
+    
+    entity.motion.velocity = v2Add(
+        entity.motion.velocity, 
+        v2Multiply(acceleration, secondsElapsed));
+        
+    var distanceRemaining = entity.motion.distanceLimit;
+    if(distanceRemaining == 0)
+    {
+        distanceRemaining = 10000;
+    }
+    
+    for(var i = 0;
+        i < 4;
+        ++i)
+    {
+        var tMin = 1;
+        var positionDeltaLength = v2Length(positionDelta);
+        if(positionDeltaLength > 0)
+        {
+            if(positionDeltaLength > distanceRemaining)
+            {
+                tMin = (distanceRemaining / positionDeltaLength);
+            }
+        
+            // Note(ian): The 0, 0 is arbitrary.
+            var wallNormal = new v2(0, 0);
+            var hitEntity = null;
+            var desiredPosition = v2Add(entity.position, positionDelta);
+            
+            // Todo(ian): We might want to do some sort of sim region or broad phase here so that we don't have to check every entity in the game.
+            for(var j = 0;
+                j < entities.length;
+                j++)
+            {
+                var testEntity = entities[j];
+                if(testEntity.physics != null && testEntity != entity)
+                {
+                    var diameterW = testEntity.physics.size.x + entity.physics.size.x;
+                    var diameterH = testEntity.physics.size.y + entity.physics.size.y;
+                    var minCorner = v2Multiply(new v2(diameterW, diameterH), -0.5);
+                    var maxCorner = v2Multiply(new v2(diameterW, diameterH), 0.5);
+                    var rel = v2Subtract(entity.position, testEntity.position);
+                    
+                    var testResult = TestWall(minCorner.X, rel.X, rel.Y, positionDelta.X, positionDelta.Y, tMin, minCorner.Y, maxCorner.Y);
+                    tMin = testResult.newTMin;
+                    if(testResult.hit)
+                    {
+                        wallNormal = v2(-1, 0);
+                        hitEntity = testEntity;
+                    }
+            
+                    var testResult = TestWall(maxCorner.X, rel.X, rel.Y, positionDelta.X, positionDelta.Y, tMin, minCorner.Y, maxCorner.Y);
+                    tMin = testResult.newTMin;
+                    if(testResult.hit)
+                    {
+                        wallNormal = v2(1, 0);
+                        hitEntity = testEntity;
+                    }
+            
+                    var testResult = TestWall(minCorner.Y, rel.Y, rel.X, positionDelta.Y, positionDelta.X, tMin, minCorner.X, maxCorner.X);
+                    tMin = testResult.newTMin;
+                    if(testResult.hit)
+                    {
+                        wallNormal = v2(0, -1);
+                        hitEntity = testEntity;
+                    }
+            
+                    var testResult = TestWall(maxCorner.Y, rel.Y, rel.X, positionDelta.Y, positionDelta.X, tMin, minCorner.X, maxCorner.X);
+                    tMin = testResult.newTMin;
+                    if(testResult.hit)
+                    {
+                        wallNormal = v2(0, 1);
+                        hitEntity = testEntity;
+                    }
+                }
+            }
+            
+            v2AddAssign(entity.position, v2Multiply(positionDelta, tMin));
+            distanceRemaining -= tMin * positionDeltaLength;
+            if(hitEntity != null)
+            {
+                positionDelta = v2Subtract(desiredPosition, entity.position);
+                //handleCollision(entity, hitEntity);
+                // Note(ian): Ignore this code for objects that handle collisions but don't prevent movement.
+                positionDelta = v2Subtract(positionDelta,
+                    v2Multiply(wallNormal, v2Inner(positionDelta, wallNormal)));
+                entity.position = v2Subtract(entity.position,
+                    v2Multiply(wallNormal, v2Inner(entity.position, wallNormal)));
+            }
+            else
+            {
+                break;
+            }
+        }
+        else
+        {
+            break;
+        }
+    }
+    
+    if(entity.motion.distanceLimit != 0)
+    {
+        entity.motion.distanceLimit = distanceRemaining;
+    }
+    
+    // // TODO(casey): Change to using the acceleration vector
+    // if((Entity->dP.X == 0.0f) && (Entity->dP.Y == 0.0f))
+    // {
+        // // NOTE(casey): Leave FacingDirection whatever it was
+    // }
+    // else if(AbsoluteValue(Entity->dP.X) > AbsoluteValue(Entity->dP.Y))
+    // {
+        // if(Entity->dP.X > 0)
+        // {
+            // Entity->FacingDirection = 0;
+        // }
+        // else
+        // {
+            // Entity->FacingDirection = 2;
+        // }
+    // }
+    // else
+    // {
+        // if(Entity->dP.Y > 0)
+        // {
+            // Entity->FacingDirection = 1;
+        // }
+        // else
+        // {
+            // Entity->FacingDirection = 3;
+        // }
+    // }
+}
+
+// Note(ian): These parameter names are only correct for 1 of the 4 calls.
+function TestWall(WallX, RelX, RelY, PlayerDeltaX, PlayerDeltaY, tMin, MinY, MaxY)
+{
+    var Hit = false;
+    var newTMin = tMin;
+    
+    var tEpsilon = 0.001;
+    if(PlayerDeltaX != 0)
+    {
+        var tResult = (WallX - RelX) / PlayerDeltaX;
+        var Y = RelY + tResult*PlayerDeltaY;
+        if((tResult >= 0) && (tMin > tResult))
+        {
+            if((Y >= MinY) && (Y <= MaxY))
+            {
+                newTMin = Maximum(0, tResult - tEpsilon);
+                Hit = true;
+            }
+        }
+    }
+
+    return {
+        hit: Hit,
+        newTMin : newTMin
+        };
 }
 
 function approach(start, destination, rate)
@@ -172,43 +349,46 @@ function drawCircle(x, y)
 
 function drawEntity(entity)
 {
-    var sprite = entity.sprite;    
-    var sourceX = 0;
-    var sourceY = 0;
-    var width = sprite.image.width;
-    var height = sprite.image.height;
-    
-    if(sprite.type == "animated")
+    if(entity.sprite != null)
     {
-        var frame = Math.floor(sprite.animationSeconds * sprite.framesPerSecond);
-        sourceX = sprite.frameWidth * frame;
-        width = sprite.frameWidth;
-        height = sprite.frameHeight;
-    }
-    
-    // TODO(ian): When rounding we should also consider the scale so we can have finer movement.
-    var x = entity.position.x * scale;
-    x -= width * scale / 2;
-    // Note(ian): To normalize with common maths we make y go up.
-    var y = canvasContext.canvas.height - (entity.position.y * scale);
-    y -= height * scale;
-    
-    x = Math.round(x);
-    y = Math.round(y);
-    
-    if(sprite.flipH)
-    {
-        canvasContext.save();
-        canvasContext.translate(canvasContext.canvas.width, 0);
-        canvasContext.scale(-1, 1);
-        x = canvasContext.canvas.width - x - (sprite.frameWidth * scale);
-    }
-    
-    canvasContext.drawImage(sprite.image, sourceX, sourceY, width, height, x, y, width * scale, height * scale);
-    
-    if(sprite.flipH)
-    {
-        canvasContext.restore();
+        var sprite = entity.sprite;    
+        var sourceX = 0;
+        var sourceY = 0;
+        var width = sprite.image.width;
+        var height = sprite.image.height;
+        
+        if(sprite.type == "animated")
+        {
+            var frame = Math.floor(sprite.animationSeconds * sprite.framesPerSecond);
+            sourceX = sprite.frameWidth * frame;
+            width = sprite.frameWidth;
+            height = sprite.frameHeight;
+        }
+        
+        // TODO(ian): When rounding we should also consider the scale so we can have finer movement.
+        var x = entity.position.x * scale;
+        x -= width * scale / 2;
+        // Note(ian): To normalize with common maths we make y go up.
+        var y = canvasContext.canvas.height - (entity.position.y * scale);
+        y -= height * scale;
+        
+        x = Math.round(x);
+        y = Math.round(y);
+        
+        if(sprite.flipH)
+        {
+            canvasContext.save();
+            canvasContext.translate(canvasContext.canvas.width, 0);
+            canvasContext.scale(-1, 1);
+            x = canvasContext.canvas.width - x - (sprite.frameWidth * scale);
+        }
+        
+        canvasContext.drawImage(sprite.image, sourceX, sourceY, width, height, x, y, width * scale, height * scale);
+        
+        if(sprite.flipH)
+        {
+            canvasContext.restore();
+        }
     }
     
     if(entity.physics != null)
@@ -237,9 +417,9 @@ function animatedSprite(name, frameWidth, frameHeight, framesPerSecond)
     this.flipH = false;
 }
 
-function rectanglePhysics()
+function rectanglePhysics(width, height)
 {
-    this.size = new v2(8, 8);
+    this.size = new v2(width, height);
 }
 
 function entity(x, y, sprite)
@@ -256,6 +436,7 @@ function motion()
     this.maxVelocity = 40;
     this.acceleration = 200;
     this.drag = 4;
+    this.distanceLimit = 0;
 }
 
 var entities = [];
@@ -269,7 +450,7 @@ var playerBlue = new animatedSprite("data/s_player_blue.png", 16, 32, 8);
 playerBlue.flipH = true;
 var guy = new entity(100, 100, playerRed);
 guy.motion = new motion();
-guy.physics = new rectanglePhysics();
+guy.physics = new rectanglePhysics(8, 8);
 addEntity(guy);
 
 var savePoint = new entity(200, 100, new animatedSprite("data/s_save_point_standing.png", 16, 32, 8));
@@ -277,6 +458,22 @@ addEntity(savePoint);
 
 var staticSprite = new entity(300, 100, new staticSprite("data/s_man_0.png"));
 addEntity(staticSprite);
+
+var wallOffset = new v2(50, 50);
+var wallSize = new v2(10, 10);
+for(var wallX = 0; wallX <= 10; wallX++)
+{
+    for(var wallY = 0; wallY <= 10; wallY++)
+    {
+        if((wallX == 0 || wallX == 10 || wallY == 0 || wallY == 10)
+        && wallX != 5 && wallY != 5)
+        {
+            var wall = new entity(wallX * wallSize.x + wallOffset.x, wallY * wallSize.y + wallOffset.y, null);
+            wall.physics = new rectanglePhysics(wallSize.x, wallSize.y);
+            addEntity(wall);
+        }
+    }   
+}
 
 var lastUpdateTime;
 function main()
@@ -340,12 +537,24 @@ function v2Divide(one, scalar)
     return result;
 }
 
+function v2DivideAssign(one, scalar)
+{
+    one.x = one.x / scalar;
+    one.y = one.y / scalar;
+}
+
 function v2Add(one, two)
 {
     var result = new v2();
     result.x = one.x + two.x;
     result.y = one.y + two.y;
     return result;
+}
+
+function v2AddAssign(one, two)
+{
+    one.x += two.x;
+    one.y += two.y;
 }
 
 function v2Subtract(one, two)
@@ -362,13 +571,25 @@ function v2SubtractAssign(one, two)
     one.y -= two.y;
 }
 
-function v2Length(v2)
+function v2Length(a)
 {
-    var result = Math.pow(v2.x, 2) + Math.pow(v2.y, 2);
+    var result = Math.pow(a.x, 2) + Math.pow(a.y, 2);
     result = Math.sqrt(result);
     return result;
 }
 
+function v2Inner(a, b)
+{
+    return Result = a.x*b.x + a.y*b.y;
+}
+
+function v2NormalizeAssign(a)
+{
+    if(a.x != 0 || a.y != 0)
+    {
+        v2DivideAssign(a, v2Length(a));
+    }
+}
 
 /*
 var FPS = 30;
