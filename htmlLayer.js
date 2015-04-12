@@ -122,7 +122,7 @@ function moveEntity(entity, acceleration, secondsElapsed)
 {
     // todo: handle the case where entity doesn't have a physics?
     
-    // note: casey has a note here saying we need to implement ODE?    
+    // ote: casey has a note here saying we need to implement ODE?    
     var drag = 5;
     v2AddAssign(acceleration, v2Multiply(entity.motion.velocity, -drag));
     
@@ -172,51 +172,51 @@ function moveEntity(entity, acceleration, secondsElapsed)
                     var maxCorner = v2Multiply(new v2(diameterW, diameterH), 0.5);
                     var rel = v2Subtract(entity.position, testEntity.position);
                     
-                    var testResult = TestWall(minCorner.X, rel.X, rel.Y, positionDelta.X, positionDelta.Y, tMin, minCorner.Y, maxCorner.Y);
+                    var testResult = TestWall(minCorner.x, rel.x, rel.y, positionDelta.x, positionDelta.y, tMin, minCorner.y, maxCorner.y);
                     tMin = testResult.newTMin;
                     if(testResult.hit)
                     {
-                        wallNormal = v2(-1, 0);
+                        wallNormal = new v2(-1, 0);
                         hitEntity = testEntity;
                     }
             
-                    var testResult = TestWall(maxCorner.X, rel.X, rel.Y, positionDelta.X, positionDelta.Y, tMin, minCorner.Y, maxCorner.Y);
+                    var testResult = TestWall(maxCorner.x, rel.x, rel.y, positionDelta.x, positionDelta.y, tMin, minCorner.y, maxCorner.y);
                     tMin = testResult.newTMin;
                     if(testResult.hit)
                     {
-                        wallNormal = v2(1, 0);
+                        wallNormal = new v2(1, 0);
                         hitEntity = testEntity;
                     }
             
-                    var testResult = TestWall(minCorner.Y, rel.Y, rel.X, positionDelta.Y, positionDelta.X, tMin, minCorner.X, maxCorner.X);
+                    var testResult = TestWall(minCorner.y, rel.y, rel.x, positionDelta.y, positionDelta.x, tMin, minCorner.x, maxCorner.x);
                     tMin = testResult.newTMin;
                     if(testResult.hit)
                     {
-                        wallNormal = v2(0, -1);
+                        wallNormal = new v2(0, -1);
                         hitEntity = testEntity;
                     }
             
-                    var testResult = TestWall(maxCorner.Y, rel.Y, rel.X, positionDelta.Y, positionDelta.X, tMin, minCorner.X, maxCorner.X);
+                    var testResult = TestWall(maxCorner.y, rel.y, rel.x, positionDelta.y, positionDelta.x, tMin, minCorner.x, maxCorner.x);
                     tMin = testResult.newTMin;
                     if(testResult.hit)
                     {
-                        wallNormal = v2(0, 1);
+                        wallNormal = new v2(0, 1);
                         hitEntity = testEntity;
                     }
                 }
             }
             
-            v2AddAssign(entity.position, v2Multiply(positionDelta, tMin));
+            entity.position = v2Add(entity.position, v2Multiply(positionDelta, tMin));
             distanceRemaining -= tMin * positionDeltaLength;
             if(hitEntity != null)
             {
                 positionDelta = v2Subtract(desiredPosition, entity.position);
                 //handleCollision(entity, hitEntity);
-                // Note(ian): Ignore this code for objects that handle collisions but don't prevent movement.
+                // Note(ian): Ignore this code for objects that handle collisions but don't prevent movement.  Also might want to record the contant and ignore it until contact breaks.
                 positionDelta = v2Subtract(positionDelta,
                     v2Multiply(wallNormal, v2Inner(positionDelta, wallNormal)));
-                entity.position = v2Subtract(entity.position,
-                    v2Multiply(wallNormal, v2Inner(entity.position, wallNormal)));
+                entity.motion.velocity = v2Subtract(entity.motion.velocity,
+                    v2Multiply(wallNormal, v2Inner(entity.motion.velocity, wallNormal)));
             }
             else
             {
@@ -278,7 +278,7 @@ function TestWall(WallX, RelX, RelY, PlayerDeltaX, PlayerDeltaY, tMin, MinY, Max
         {
             if((Y >= MinY) && (Y <= MaxY))
             {
-                newTMin = Maximum(0, tResult - tEpsilon);
+                newTMin = Math.max(0, tResult - tEpsilon);
                 Hit = true;
             }
         }
