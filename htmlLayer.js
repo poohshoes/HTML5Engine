@@ -152,6 +152,15 @@ function draw()
     }
 }
 
+function drawRectangle(center, size)
+{
+    var halfSize = v2Divide(size, 2);
+    var topLeft = v2Subtract(center, halfSize);
+    topLeft.y += size.y;
+    canvasContext.fillStyle = 'magenta';
+    canvasContext.fillRect(topLeft.x * scale, canvasContext.canvas.height - (topLeft.y * scale), size.x * scale, size.y * scale);
+}
+
 function drawCircle(x, y)
 {
     var radius = 2 * scale;
@@ -197,12 +206,15 @@ function drawEntity(entity)
     
     canvasContext.drawImage(sprite.image, sourceX, sourceY, width, height, x, y, width * scale, height * scale);
     
-    
     if(sprite.flipH)
     {
         canvasContext.restore();
     }
     
+    if(entity.physics != null)
+    {
+        drawRectangle(entity.position, entity.physics.size);
+    }
     drawCircle(entity.position.x, entity.position.y);
 }
 
@@ -225,11 +237,17 @@ function animatedSprite(name, frameWidth, frameHeight, framesPerSecond)
     this.flipH = false;
 }
 
+function rectanglePhysics()
+{
+    this.size = new v2(8, 8);
+}
+
 function entity(x, y, sprite)
 {
     this.position = new v2(x, y);
     this.sprite = sprite;
     this.motion = null;
+    this.physics = null;
 }
 
 function motion()
@@ -251,6 +269,7 @@ var playerBlue = new animatedSprite("data/s_player_blue.png", 16, 32, 8);
 playerBlue.flipH = true;
 var guy = new entity(100, 100, playerRed);
 guy.motion = new motion();
+guy.physics = new rectanglePhysics();
 addEntity(guy);
 
 var savePoint = new entity(200, 100, new animatedSprite("data/s_save_point_standing.png", 16, 32, 8));
@@ -313,11 +332,27 @@ function v2MultiplyAssign(v2, scalar)
     v2.y *= scalar;
 }
 
+function v2Divide(one, scalar)
+{
+    var result = new v2();
+    result.x = one.x / scalar;
+    result.y = one.y / scalar;
+    return result;
+}
+
 function v2Add(one, two)
 {
     var result = new v2();
     result.x = one.x + two.x;
     result.y = one.y + two.y;
+    return result;
+}
+
+function v2Subtract(one, two)
+{
+    var result = new v2();
+    result.x = one.x - two.x;
+    result.y = one.y - two.y;
     return result;
 }
 
