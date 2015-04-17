@@ -214,11 +214,11 @@ gamepaddisconnected
 keydown, keypress, keyup
 mousedown, mousemove, mouseleave, mouseenter, mouseup, mouseout, mouseover*/
 
-var scale = 2;
+var startScale = 2;
 var canvas = document.createElement("canvas");
 var canvasContext = canvas.getContext("2d");
-canvas.width = 480 * scale;
-canvas.height = 270 * scale;
+canvas.width = 480 * startScale;
+canvas.height = 270 * startScale;
 canvas.style.display = "block";
 canvas.style.margin = "0px auto";
 //http://www.dbp-consulting.com/tutorials/canvas/CanvasKeyEvents.html
@@ -255,7 +255,10 @@ function ascii(character)
     return result;
 }
 
+//
 //====== UPDATE ======
+//
+
 function update(secondsElapsed) 
 {
     var playerAcceleration = new v2();
@@ -271,11 +274,11 @@ function update(secondsElapsed)
     }
     if(keysDown[ascii("W")])
     {
-        playerAcceleration.y += 1;
+        playerAcceleration.y -= 1;
     }
     if(keysDown[ascii("S")])
     {
-        playerAcceleration.y -= 1;
+        playerAcceleration.y += 1;
     }
     if(playerAcceleration.x == 0 && playerAcceleration.y == 0)
     {
@@ -506,13 +509,20 @@ function approach(start, destination, rate)
     }
 }
 
+//
 //====== DRAW ======
+//
+
 function draw()
 {
     // Fill to black.
     canvasContext.fillStyle = "#000000";
     canvasContext.fillRect(0,0,canvas.width,canvas.height);
 
+    var cameraOffset = v2Multiply(camera.target.position, camera.scale);
+    cameraOffset = v2Subtract(cameraOffset, new v2(canvas.width/2, canvas.height/2));
+    camera.offset = cameraOffset;
+    
     for(i = 0;
         i < mapData.layers.length;
         i++)
@@ -530,13 +540,18 @@ function draw()
                 var spriteID = layer.data[tileX + (tileY * mapData.width)];
                 if(spriteID != 0)
                 {
+                    var x = tileX * mapData.tileWidth;
+                    var y = tileY * mapData.tileHeight;
+                    x = (x * camera.scale) - camera.offset.x;
+                    y = (y * camera.scale) - camera.offset.y;
                     var tile = mapData.tiles[spriteID];
-                    canvasContext.drawImage(tile.image, tileX * mapData.tileWidth, tileY * mapData.tileHeight);
+                    canvasContext.drawImage(tile.image, x, y, mapData.tileWidth * camera.scale, mapData.tileHeight * camera.scale);
                 }
             }
         }
     }
     
+    // todo(ian): Order by Y value before drawing.
     for(i = 0;
         i < entities.length;
         i++)
@@ -549,16 +564,20 @@ function drawRectangle(center, size)
 {
     var halfSize = v2Divide(size, 2);
     var topLeft = v2Subtract(center, halfSize);
-    topLeft.y += size.y;
+    topLeft = v2Multiply(topLeft, camera.scale);
+    topLeft = v2Subtract(topLeft, camera.offset);
     canvasContext.fillStyle = 'magenta';
-    canvasContext.fillRect(topLeft.x * scale, canvasContext.canvas.height - (topLeft.y * scale), size.x * scale, size.y * scale);
+    canvasContext.fillRect(topLeft.x, topLeft.y, size.x * camera.scale, size.y * camera.scale);
 }
 
 function drawCircle(x, y)
 {
-    var radius = 2 * scale;
+    var radius = 2 * camera.scale;
     canvasContext.beginPath();
-    canvasContext.arc(x * scale, canvasContext.canvas.height - (y * scale), radius, 0, 2 * Math.PI, false);
+    x = (x * camera.scale) - camera.offset.x;
+    y = (y * camera.scale) - camera.offset.y;
+    //canvasContext.arc(x, canvasContext.canvas.height - y, radius, 0, 2 * Math.PI, false);
+    canvasContext.arc(x, y, radius, 0, 2 * Math.PI, false);
     canvasContext.fillStyle = 'green';
     canvasContext.fill();
 }
@@ -581,25 +600,32 @@ function drawEntity(entity)
             height = sprite.frameHeight;
         }
         
-        // TODO(ian): When rounding we should also consider the scale so we can have finer movement.
-        var x = entity.position.x * scale;
-        x -= width * scale / 2;
-        // Note(ian): To normalize with common maths we make y go up.
-        var y = canvasContext.canvas.height - (entity.position.y * scale);
-        y -= height * scale;
+        var x = entity.position.x * camera.scale;
+        var y = entity.position.y * camera.scale;
         
+        x -= camera.offset.x;
+        y -= camera.offset.y;
+        
+        // Note(ian): To normalize with common maths we make y go up.
+        //y = canvas.height - y;
+        
+        // Note(ian): Make the origin the bottom center of the sprite.
+        x -= width * camera.scale / 2;
+        y -= height * camera.scale;
+        
+        // TODO(ian): When rounding we should also consider the scale so we can have finer movement.
         x = Math.round(x);
         y = Math.round(y);
         
         if(sprite.flipH)
         {
             canvasContext.save();
-            canvasContext.translate(canvasContext.canvas.width, 0);
+            canvasContext.translate(canvas.width, 0);
             canvasContext.scale(-1, 1);
-            x = canvasContext.canvas.width - x - (sprite.frameWidth * scale);
+            x = canvas.width - x - (sprite.frameWidth * camera.scale);
         }
         
-        canvasContext.drawImage(sprite.image, sourceX, sourceY, width, height, x, y, width * scale, height * scale);
+        canvasContext.drawImage(sprite.image, sourceX, sourceY, width, height, x, y, width * camera.scale, height * camera.scale);
         
         if(sprite.flipH)
         {
@@ -614,7 +640,7 @@ function drawEntity(entity)
     drawCircle(entity.position.x, entity.position.y);
 }
 
-//
+//s
 //====== INITIALIZE ======
 //
 
@@ -679,24 +705,33 @@ addEntity(savePoint);
 var staticSprite = new entity(300, 100, new staticSprite("data/s_man_0.png"));
 addEntity(staticSprite);
 
-var wallOffset = new v2(50, 50);
-var wallSize = new v2(10, 10);
-for(var wallX = 0; wallX <= 10; wallX++)
-{
-    for(var wallY = 0; wallY <= 10; wallY++)
-    {
-        if((wallX == 0 || wallX == 10 || wallY == 0 || wallY == 10)
-        && wallX != 5 && wallY != 5)
-        {
-            var wall = new entity(wallX * wallSize.x + wallOffset.x, wallY * wallSize.y + wallOffset.y, null);
-            wall.physics = new rectanglePhysics(wallSize.x, wallSize.y);
-            addEntity(wall);
-        }
-    }   
-}
+//var wallOffset = new v2(50, 50);
+//var wallSize = new v2(10, 10);
+//for(var wallX = 0; wallX <= 10; wallX++)
+//{
+//    for(var wallY = 0; wallY <= 10; wallY++)
+//    {
+//        if((wallX == 0 || wallX == 10 || wallY == 0 || wallY == 10)
+//        && wallX != 5 && wallY != 5)
+//        {
+//            var wall = new entity(wallX * wallSize.x + wallOffset.x, wallY * wallSize.y + wallOffset.y, null);
+//            wall.physics = new rectanglePhysics(wallSize.x, wallSize.y);
+//            addEntity(wall);
+//        }
+//    }   
+//}
 
 var mapData = new Object();
 loadMap(map1);
+
+var camera = new Object();
+camera.scale = 2;
+camera.target = guy;
+camera.offset = new v2(0, 0);
+
+//
+//====== GAME LOOP ======
+//
 
 var lastUpdateTime;
 function main()
@@ -753,18 +788,62 @@ function loadMap(mapJson)
         var layer = mapJson.layers[i];
         if(layer.type == "tilelayer")
         {
-            mapData.layers[mapData.layers.length] = layer;
-            layerZ++;
+            if(layer.name == "collisionTiles")
+            {
+                // Note(ian): It could be better to store and access these as tiles instead of making an entity for each tile.
+                for(var tileX = 0;
+                    tileX < mapData.width;
+                    tileX++)
+                {
+                    for(var tileY = 0;
+                        tileY < mapData.height;
+                        tileY++)
+                    {
+                        // Todo(ian): Scale and offset this properly.
+                        var spriteID = layer.data[tileX + (tileY * mapData.width)];
+                        if(spriteID != 0)
+                        {
+                            var x = tileX * mapData.tileWidth;
+                            var y = tileY * mapData.tileHeight;
+                            var wall = new entity(x + (mapData.tileWidth/2), y + (mapData.tileHeight/2) , null);
+                            wall.physics = new rectanglePhysics(mapData.tileWidth, mapData.tileHeight);
+                            addEntity(wall);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                mapData.layers[mapData.layers.length] = layer;
+                layerZ++;
+            }
         }
         else if(layer.type == "objectgroup")
         {
             if(layer.name == "collisionObject")
             {
-                // todo: load entities for collision
+                for(var j = 0; j < layer.objects.length; j++)
+                {
+                    var object = layer.objects[j];
+                    var wall = new entity(object.x + (object.width/2), object.y + (object.height/2) , null);
+                    wall.physics = new rectanglePhysics(object.width, object.height);
+                    addEntity(wall);
+                }
             }
             else
             {
-                // todo: load player spawn
+                for(var j = 0; j < layer.objects.length; j++)
+                {
+                    var object = layer.objects[j];
+                    if(object.name == "playerSpawn")
+                    {
+                        guy.position.x = object.x;
+                        guy.position.y = object.y;
+                        
+                        savePoint.position = v2Add(guy.position, new v2(100, 0));
+                        staticSprite.position = v2Add(guy.position, new v2(200, 0));
+                    }
+                }
             }
         }
     }

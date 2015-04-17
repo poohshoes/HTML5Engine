@@ -1,6 +1,5 @@
 TODO
 
-- loading from a map editor
 - particle engine
 - loading screen
 - pathfinding
