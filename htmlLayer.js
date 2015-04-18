@@ -552,6 +552,12 @@ function draw()
     }
     
     // todo(ian): Order by Y value before drawing.
+    entities.sort(
+        function (a, b)
+        {
+            return a.position.y - b.position.y;
+        });
+    
     for(i = 0;
         i < entities.length;
         i++)
@@ -728,6 +734,9 @@ var camera = new Object();
 camera.scale = 2;
 camera.target = guy;
 camera.offset = new v2(0, 0);
+
+// var testSound = new Audio("data/audio/sound1.wav");
+// testSound.play();
 
 //
 //====== GAME LOOP ======
